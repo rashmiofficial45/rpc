@@ -52,3 +52,12 @@ app.post("/rpc", (req, res) => {
 app.listen(port, () => {
   console.log(`JSON-RPC server listening at http://localhost:${port}`)
 })
+
+// {
+//   "jsonrpc": "2.0",
+//   "id": 1,
+//   "method": "add",
+//   "params": [
+//     1, 2
+//   ]
+// }
