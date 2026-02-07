@@ -1,63 +1,46 @@
-import express from "express"
-import bodyParser from "body-parser"
+import path from "path"
+import * as grpc from "@grpc/grpc-js"
+import { GrpcObject, ServiceClientConstructor } from "@grpc/grpc-js"
+import * as protoLoader from "@grpc/proto-loader"
 
-const app = express()
-const port = 3000
+const packageDefinition = protoLoader.loadSync(
+  path.join(__dirname, "./message.proto"),
+)
 
-// Parse JSON bodies
-app.use(bodyParser.json())
+const personProto = grpc.loadPackageDefinition(packageDefinition)
 
-// Define a sample method
-function add(a:number, b:number) {
-  return a + b
+const PERSONS = [
+  {
+    name: "harkirat",
+    age: 45,
+  },
+  {
+    name: "raman",
+    age: 45,
+  },
+]
+
+//@ts-ignore
+function addPerson(call, callback) {
+  console.log(call)
+  let person = {
+    name: call.request.name,
+    age: call.request.age,
+  }
+  PERSONS.push(person)
+  callback(null, person)
+  console.log(PERSONS)
 }
+const server = new grpc.Server()
 
-// Handle JSON-RPC requests
-app.post("/rpc", (req, res) => {
-  const { jsonrpc, method, params, id } = req.body
-
-  if (jsonrpc !== "2.0" || !method || !Array.isArray(params)) {
-    res
-      .status(400)
-      .json({
-        jsonrpc: "2.0",
-        error: { code: -32600, message: "Invalid Request" },
-        id,
-      })
-    return
-  }
-
-  // Execute the method
-  let result
-  switch (method) {
-    case "add":
-      result = add(params[0], params[1])
-      break
-    default:
-      res
-        .status(404)
-        .json({
-          jsonrpc: "2.0",
-          error: { code: -32601, message: "Method not found" },
-          id,
-        })
-      return
-  }
-
-  // Send back the response
-  res.json({ jsonrpc: "2.0", result, id })
-})
-
-// Start the server
-app.listen(port, () => {
-  console.log(`JSON-RPC server listening at http://localhost:${port}`)
-})
-
-// {
-//   "jsonrpc": "2.0",
-//   "id": 1,
-//   "method": "add",
-//   "params": [
-//     1, 2
-//   ]
-// }
+server.addService(
+  (personProto.AddressBookService as ServiceClientConstructor).service,
+  { addPerson: addPerson },
+)
+server.bindAsync(
+  "0.0.0.0:50051",
+  grpc.ServerCredentials.createInsecure(),
+  () => {
+    server.start()
+  },
+)

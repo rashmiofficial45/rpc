@@ -1,51 +1,59 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = __importDefault(require("express"));
-const body_parser_1 = __importDefault(require("body-parser"));
-const app = (0, express_1.default)();
-const port = 3000;
-// Parse JSON bodies
-app.use(body_parser_1.default.json());
-// Define a sample method
-function add(a, b) {
-    return a + b;
+const path_1 = __importDefault(require("path"));
+const grpc = __importStar(require("@grpc/grpc-js"));
+const protoLoader = __importStar(require("@grpc/proto-loader"));
+const packageDefinition = protoLoader.loadSync(path_1.default.join(__dirname, "./message.proto"));
+const personProto = grpc.loadPackageDefinition(packageDefinition);
+const PERSONS = [
+    {
+        name: "harkirat",
+        age: 45,
+    },
+    {
+        name: "raman",
+        age: 45,
+    },
+];
+//@ts-ignore
+function addPerson(call, callback) {
+    console.log(call);
+    let person = {
+        name: call.request.name,
+        age: call.request.age,
+    };
+    PERSONS.push(person);
+    callback(null, person);
+    console.log(PERSONS);
 }
-// Handle JSON-RPC requests
-app.post("/rpc", (req, res) => {
-    const { jsonrpc, method, params, id } = req.body;
-    if (jsonrpc !== "2.0" || !method || !Array.isArray(params)) {
-        res
-            .status(400)
-            .json({
-            jsonrpc: "2.0",
-            error: { code: -32600, message: "Invalid Request" },
-            id,
-        });
-        return;
-    }
-    // Execute the method
-    let result;
-    switch (method) {
-        case "add":
-            result = add(params[0], params[1]);
-            break;
-        default:
-            res
-                .status(404)
-                .json({
-                jsonrpc: "2.0",
-                error: { code: -32601, message: "Method not found" },
-                id,
-            });
-            return;
-    }
-    // Send back the response
-    res.json({ jsonrpc: "2.0", result, id });
-});
-// Start the server
-app.listen(port, () => {
-    console.log(`JSON-RPC server listening at http://localhost:${port}`);
+const server = new grpc.Server();
+server.addService(personProto.AddressBookService.service, { addPerson: addPerson });
+server.bindAsync("0.0.0.0:50051", grpc.ServerCredentials.createInsecure(), () => {
+    server.start();
 });
